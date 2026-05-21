@@ -6,7 +6,9 @@ import {
   deleteTodo,
   getTodos,
   type Todo,
+  type TodoImage,
   updateTodo,
+  uploadImage,
 } from "../lib/api";
 import TodoForm from "./todo-form";
 import TodoItem from "./todo-item";
@@ -35,11 +37,30 @@ function Todos() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  const handleCreateTodo = async (title: string) => {
+  const handleCreateTodo = async (title: string, file?: File) => {
     try {
       setError(null);
       const newTodo = await createTodo(title);
-      setTodos((prevTodos) => [newTodo, ...prevTodos]);
+      
+      // If an image file is provided, upload it
+      if (file) {
+        try {
+          const uploadedImage = await uploadImage(newTodo.id, file);
+          // Add the image to the todo
+          const todoWithImage: Todo = {
+            ...newTodo,
+            images: [uploadedImage],
+          };
+          setTodos((prevTodos) => [todoWithImage, ...prevTodos]);
+        } catch (uploadErr) {
+          // If image upload fails, still show the created todo
+          console.error("Image upload failed:", uploadErr);
+          setTodos((prevTodos) => [newTodo, ...prevTodos]);
+          setError("Todo created but image upload failed");
+        }
+      } else {
+        setTodos((prevTodos) => [newTodo, ...prevTodos]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create todo");
     }
@@ -68,6 +89,39 @@ function Todos() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update todo");
+    }
+  };
+
+  const handleImageUploaded = async (todoId: string, image: TodoImage) => {
+    try {
+      setTodos((prevTodos) =>
+        prevTodos.map((todo) => 
+          todo.id === todoId 
+            ? { ...todo, images: [...(todo.images || []), image] }
+            : todo
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update todo with image");
+    }
+  };
+
+  const handleImageDeleted = async (todoId: string, imageId: string) => {
+    try {
+      setTodos((prevTodos) =>
+        prevTodos.map((todo) =>
+          todo.id === todoId
+            ? {
+                ...todo,
+                images: (todo.images || []).filter(
+                  (img) => img.imageId !== imageId
+                ),
+              }
+            : todo
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove image from todo");
     }
   };
 
@@ -115,6 +169,8 @@ function Todos() {
                 todo={todo}
                 onDelete={handleDeleteTodo}
                 onUpdate={handleUpdateTodo}
+                onImageUploaded={handleImageUploaded}
+                onImageDeleted={handleImageDeleted}
               />
             );
           })}

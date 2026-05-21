@@ -1,19 +1,30 @@
 "use client";
 import { FormEvent, useState } from "react";
-import { Todo } from "../lib/api";
+import { Todo, TodoImage } from "../lib/api";
 import Button from "../ui/button";
 import Label from "../ui/label";
+import ImageUpload from "./image-upload";
+import ImageGallery from "./image-gallery";
 
 type TodoItemProps = {
   todo: Todo;
   onDelete: (id: string) => Promise<void>;
   onUpdate: (id: string, title: string, completed: boolean) => Promise<void>;
+  onImageUploaded?: (todoId: string, image: TodoImage) => Promise<void>;
+  onImageDeleted?: (todoId: string, imageId: string) => Promise<void>;
 };
 
-function TodoItem({ todo, onDelete, onUpdate }: TodoItemProps) {
+function TodoItem({
+  todo,
+  onDelete,
+  onUpdate,
+  onImageUploaded,
+  onImageDeleted,
+}: TodoItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(todo.title);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [images, setImages] = useState<TodoImage[]>(todo.images || []);
 
   const handleToggle = async () => {
     try {
@@ -46,6 +57,21 @@ function TodoItem({ todo, onDelete, onUpdate }: TodoItemProps) {
       setIsSubmitting(false);
     }
   };
+
+  const handleImageUploaded = async (image: TodoImage) => {
+    setImages((current) => [...current, image]);
+    if (onImageUploaded) {
+      await onImageUploaded(todo.id, image);
+    }
+  };
+
+  const handleImageDeleted = async (imageId: string) => {
+    setImages((current) => current.filter((img) => img.imageId !== imageId));
+    if (onImageDeleted) {
+      await onImageDeleted(todo.id, imageId);
+    }
+  };
+
   return (
     <li className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm transition hover:shadow-md">
       <div className="flex items-start gap-3">
@@ -95,6 +121,11 @@ function TodoItem({ todo, onDelete, onUpdate }: TodoItemProps) {
               <p className="mt-1 text-xs text-slate-500">
                 {new Date(todo.createdAt).toLocaleString()}
               </p>
+              {images.length > 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  📷 {images.length} image{images.length !== 1 ? "s" : ""}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -120,6 +151,15 @@ function TodoItem({ todo, onDelete, onUpdate }: TodoItemProps) {
             </Button>
           </div>
         )}
+      </div>
+
+      <div className="mt-4 pl-7 space-y-3 border-l-2 border-slate-200">
+        <ImageUpload todoId={todo.id} onImageUploaded={handleImageUploaded} />
+        <ImageGallery
+          todoId={todo.id}
+          images={images}
+          onImageDeleted={handleImageDeleted}
+        />
       </div>
     </li>
   );
